@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use aruna_rust_api::api::storage::models::v2::generic_resource::Resource;
 use aruna_rust_api::api::storage::models::v2::{KeyValue, KeyValueVariant};
 use regex::Regex;
+use tonic::transport::{Channel, ClientTlsConfig};
 
 
 #[tokio::main]
@@ -45,9 +46,14 @@ async fn validator(request: Request) -> Result<String> {
 
         dbg!(&file);
         let fasta_regex = Regex::new(r"^[^\S\n]*>[^\s>].*(?:\n[^\S\n]*[AGTC\n]+)+$")?;
-        let mut hooks_client = HooksServiceClient::connect(dotenvy::var("ARUNA_ADDRESS")?)
-            .await
+        let tls_config = ClientTlsConfig::new();
+        let endpoint = Channel::from_shared(dotenvy::var("ARUNA_ADDRESS").unwrap())
+            .unwrap()
+            .tls_config(tls_config)
             .unwrap();
+        let mut hooks_client =
+            HooksServiceClient::connect(endpoint).await.unwrap();
+
         let response = if fasta_regex.is_match(&file) {
             let request = tonic::Request::new(HookCallbackRequest {
                 status: Some(Status::Finished(Finished {
